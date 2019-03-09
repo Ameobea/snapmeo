@@ -4,17 +4,17 @@ name = "snapmeo"
 version = "0.1.0"
 
 [dependencies]
-chrono = "0.4.3"
-clap = "2.31.2"
-clipboard = "0.4.6"
-colored = "1.6.0"
+chrono = "0.4.6"
+clap = "2.32.0"
+clipboard = "0.5.0"
+colored = "1.7.0"
 repng = "0.2.2"
-reqwest = "0.8.6"
+reqwest = "0.9.11"
 scrap = "0.5.0"
 
 [dependencies.sdl2]
 features = ["image"]
-version = "0.31.0"
+version = "0.32.1"
 
 [profile.release]
 opt-level=3
