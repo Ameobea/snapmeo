@@ -2,19 +2,20 @@
 authors = ["Casey Primozic <me@ameo.link>"]
 name = "snapmeo"
 version = "0.1.0"
+edition = "2018"
 
 [dependencies]
-chrono = "0.4.6"
-clap = "2.32.0"
+chrono = "0.4"
+clap = "2.33"
 clipboard = "0.5.0"
-colored = "1.7.0"
+colored = "2.0"
 repng = "0.2.2"
-reqwest = "0.9.11"
+reqwest = { version = "0.10", default-features = false, features = ["blocking", "default-tls"] }
 scrap = "0.5.0"
 
 [dependencies.sdl2]
 features = ["image"]
-version = "0.32.1"
+version = "0.34"
 
 [profile.release]
 opt-level=3

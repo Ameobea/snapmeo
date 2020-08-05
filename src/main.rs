@@ -38,24 +38,25 @@ fn ameotrack_upload<P: AsRef<Path>>(
     expiry: String,
     secret: bool,
     one_time: bool,
-) -> Result<String, Box<Error>> {
+) -> Result<String, Box<dyn Error>> {
     let password = env::var("AMEOTRACK_PASSWORD")
         .expect("The `AMEOTRACK_PASSWORD` environment variable must be set!");
 
-    let body = reqwest::multipart::Form::new()
+    let body = reqwest::blocking::multipart::Form::new()
         .file("file", filename)?
         .text("secret", if secret { "1" } else { "" })
         .text("expiry", expiry)
         .text("password", password)
         .text("oneTime", if one_time { "1" } else { "" });
 
-    let client = reqwest::Client::new();
-    let mut res = client.post(AMEOTRACK_UPLOAD_URL).multipart(body).send()?;
+    let client = reqwest::blocking::Client::new();
+    let res = client.post(AMEOTRACK_UPLOAD_URL).multipart(body).send()?;
+    let status = res.status();
 
     let res_text = res
         .text()
         .expect("Unable to parse HTTP response into text!");
-    if !res.status().is_success() {
+    if !status.is_success() {
         println!("Error uploading image to AmeoTrack: {:?}", res_text);
         exit(1);
     }
@@ -160,45 +161,47 @@ pub fn main() {
 
         let mut rect_corner_1: (i32, i32) = (0, 0);
 
-        let finish_screenshot =
-            move |rect_corner_1: (i32, i32), rect_corner_2: (i32, i32)| -> Result<(), Box<Error>> {
-                // println!("Corners: {:?}, {:?}", rect_corner_1, rect_corner_2);
-                let rect_width = (rect_corner_1.0 - rect_corner_2.0).abs() as usize;
-                let rect_height = (rect_corner_1.1 - rect_corner_2.1).abs() as usize;
-                let min_x = cmp::min(rect_corner_1.0, rect_corner_2.0) as usize;
-                let min_y = cmp::min(rect_corner_1.1, rect_corner_2.1) as usize;
-                let mut flip_buffer: Vec<u8> = Vec::with_capacity(rect_width * rect_height * 4);
-                let stride = width * 4;
+        let finish_screenshot = move |rect_corner_1: (i32, i32),
+                                      rect_corner_2: (i32, i32)|
+              -> Result<(), Box<dyn Error>> {
+            // println!("Corners: {:?}, {:?}", rect_corner_1, rect_corner_2);
+            let rect_width = (rect_corner_1.0 - rect_corner_2.0).abs() as usize;
+            let rect_height = (rect_corner_1.1 - rect_corner_2.1).abs() as usize;
+            let min_x = cmp::min(rect_corner_1.0, rect_corner_2.0) as usize;
+            let min_y = cmp::min(rect_corner_1.1, rect_corner_2.1) as usize;
+            let mut flip_buffer: Vec<u8> = Vec::with_capacity(rect_width * rect_height * 4);
+            let stride = width * 4;
 
-                for y in 0..rect_height {
-                    for x in 0..rect_width {
-                        let i = (stride * (y + min_y)) + (4 * (x + min_x));
-                        flip_buffer.extend_from_slice(&[frame[i + 2], frame[i + 1], frame[i], 255]);
-                    }
+            for y in 0..rect_height {
+                for x in 0..rect_width {
+                    let i = (stride * (y + min_y)) + (4 * (x + min_x));
+                    flip_buffer.extend_from_slice(&[frame[i + 2], frame[i + 1], frame[i], 255]);
                 }
+            }
 
-                let file = File::create(filename.clone()).expect("Unable to create output file!");
+            let file = File::create(filename.clone()).expect("Unable to create output file!");
 
-                repng::encode(file, rect_width as u32, rect_height as u32, &flip_buffer).unwrap();
+            repng::encode(file, rect_width as u32, rect_height as u32, &flip_buffer).unwrap();
 
-                let expiry = matches.value_of("expiry").unwrap_or("-1");
-                let secret = matches.is_present("secret");
-                let one_time = matches.is_present("one-time");
+            let expiry = matches.value_of("expiry").unwrap_or("-1");
+            let secret = matches.is_present("secret");
+            let one_time = matches.is_present("one-time");
 
-                // Upload the image to AmeoTrack
-                let image_url = ameotrack_upload(filename, expiry.to_owned(), secret, one_time)?;
+            // Upload the image to AmeoTrack
+            println!("Image captured; starting upload to Ameotrack...");
+            let image_url = ameotrack_upload(filename, expiry.to_owned(), secret, one_time)?;
 
-                // Copy the URL to the clipboard and print to the console
-                let mut ctx: ClipboardContext =
-                    ClipboardProvider::new().expect("Unable to create clipboard context!");
-                ctx.set_contents(image_url.clone())
-                    .expect("Unable to set clipboard contents!");
+            // Copy the URL to the clipboard and print to the console
+            let mut ctx: ClipboardContext =
+                ClipboardProvider::new().expect("Unable to create clipboard context!");
+            ctx.set_contents(image_url.clone())
+                .expect("Unable to set clipboard contents!");
 
-                println!("{} {}", "File successfully uploaded:".green(), image_url);
-                println!("Link has been copied to the clipboard.");
+            println!("{} {}", "File successfully uploaded:".green(), image_url);
+            println!("Link has been copied to the clipboard.");
 
-                Ok(())
-            };
+            Ok(())
+        };
 
         'running: loop {
             for event in event_pump.poll_iter() {
